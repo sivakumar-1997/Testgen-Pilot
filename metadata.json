@@ -1,0 +1,6 @@
+{
+  "name": "TestGen Pilot - AI Test Case Generator & RTCM",
+  "description": "Automate structured test case generation with AI memory, custom QA templates, requirements traceability matrix (RTCM), and seamless export to Google Sheets, Drive, and Docs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
