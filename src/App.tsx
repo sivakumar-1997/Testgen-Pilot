@@ -266,12 +266,24 @@ export default function App() {
       }),
     });
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || `Generation failed with status ${response.status}`);
+    const responseText = await response.text();
+    let data: any;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      // The server returned HTML instead of JSON (e.g. 502/504 Bad Gateway, or SPA rewrite)
+      if (!response.ok) {
+        throw new Error(
+          `AI service returned status ${response.status} (Temporary Gateway/Service error). Please try again in a moment.`
+        );
+      }
+      throw new Error('Received unexpected HTML response from server. Please verify your connection or model configuration.');
     }
 
-    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error || `Generation failed with status ${response.status}`);
+    }
 
     if (data.failoverNotice) {
       setFailoverToast(data.failoverNotice);
@@ -322,7 +334,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0e14] text-[#e2e8f0] flex flex-col font-sans selection:bg-indigo-600 selection:text-white">
+    <div className="h-screen max-h-screen overflow-hidden bg-[#0b0e14] text-[#e2e8f0] flex flex-col font-sans selection:bg-indigo-600 selection:text-white">
       {/* Top Application Header */}
       <Header
         activeSuite={activeSuite}

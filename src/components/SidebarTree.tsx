@@ -236,7 +236,7 @@ export const SidebarTree: React.FC<SidebarTreeProps> = ({
   return (
     <>
       {/* Desktop fixed sidebar */}
-      <aside className="hidden lg:flex w-72 h-[calc(100vh-53px)] shrink-0">
+      <aside className="hidden lg:flex w-72 h-full shrink-0">
         {content}
       </aside>
 

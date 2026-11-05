@@ -3,7 +3,6 @@ import {
   History,
   RotateCcw,
   Sparkles,
-  Brain,
   Check,
   X,
   Plus,
@@ -42,7 +41,7 @@ export const DiffTimelineModal: React.FC<DiffTimelineModalProps> = ({
         <div className="p-4 border-b border-[#1b2233] bg-[#0c0f17] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-              <Brain className="w-4 h-4" />
+              <History className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">

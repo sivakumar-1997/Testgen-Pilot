@@ -89,7 +89,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
   const pendingCount = suite.testCases.filter((c) => c.status === 'pending').length;
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-53px)] overflow-hidden bg-[#0b0e14] text-slate-200">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-[#0b0e14] text-slate-200">
       {/* Top Banner & Scenario Title */}
       <div className="p-3.5 sm:p-4 border-b border-[#1a202c] bg-[#0e121a] flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -156,7 +156,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm shadow-indigo-600/30 transition"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>AI Brain Adjust</span>
+            <span>AI Suite Adjust</span>
           </button>
         </div>
       </div>
@@ -219,20 +219,20 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
       </div>
 
       {/* Main Table View with responsive horizontal scroll */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full min-w-[720px] text-left text-xs border-collapse">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-xs border-collapse">
           {/* Header Row */}
-          <thead className="bg-[#0e121a] text-slate-400 font-semibold sticky top-0 z-10 border-b border-[#1a202c]">
+          <thead className="bg-[#0e121a]/95 backdrop-blur-sm text-slate-400 font-semibold sticky top-0 z-10 border-b border-[#1e2638] shadow-sm">
             <tr>
               {template.columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`p-3 font-semibold tracking-wider text-slate-300 ${col.width || ''}`}
+                  className={`p-3 font-semibold tracking-wider text-slate-300 uppercase text-[11px] select-none ${col.width || ''}`}
                 >
                   {col.label}
                 </th>
               ))}
-              <th className="p-3 w-16 text-right">Actions</th>
+              <th className="p-3 w-20 text-right font-semibold tracking-wider text-slate-300 uppercase text-[11px] select-none pr-4">Actions</th>
             </tr>
           </thead>
 
@@ -278,8 +278,8 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
                                 {tc.id}
                               </span>
                               {tc.sourceOrigin === 'historical_memory' && (
-                                <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Recalled from Memory Brain">
-                                  Brain
+                                <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Recalled from Historical Memory">
+                                  Memory
                                 </span>
                               )}
                               {tc.sourceOrigin === 'imported' && (
@@ -383,7 +383,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
                       // Scope / Action
                       if (col.key === 'scope') {
                         return (
-                          <td key={col.key} className="p-3 font-medium text-slate-200 leading-snug">
+                          <td key={col.key} className="p-3 font-medium text-slate-200 leading-snug min-w-[200px]">
                             {tc.scope || tc.scenario}
                             {tc.diffType && tc.diffType !== 'unchanged' && (
                               <span
@@ -405,7 +405,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
                       // Preconditions
                       if (col.key === 'preconditions') {
                         return (
-                          <td key={col.key} className="p-3 text-slate-400 leading-snug">
+                          <td key={col.key} className="p-3 text-slate-400 leading-snug min-w-[180px]">
                             {tc.preconditions || '—'}
                           </td>
                         );
@@ -414,7 +414,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
                       // Expectation
                       if (col.key === 'expectation') {
                         return (
-                          <td key={col.key} className="p-3 text-slate-300 leading-snug">
+                          <td key={col.key} className="p-3 text-slate-300 leading-snug min-w-[220px]">
                             {tc.expectation || tc.expectedResult}
                           </td>
                         );
@@ -423,7 +423,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
                       // Expected Result
                       if (col.key === 'expectedResult') {
                         return (
-                          <td key={col.key} className="p-3 text-slate-300 leading-snug">
+                          <td key={col.key} className="p-3 text-slate-300 leading-snug min-w-[220px]">
                             {tc.expectedResult}
                           </td>
                         );
@@ -483,6 +483,39 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Table Bottom Status Bar */}
+      <div className="px-4 py-2.5 bg-[#090c13] border-t border-[#181f2c] flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 shrink-0 select-none">
+        <div className="flex items-center gap-3">
+          <span>
+            Showing <strong className="text-white">{filteredCases.length}</strong> of{' '}
+            <strong className="text-white">{suite.testCases.length}</strong> test cases
+          </span>
+          <span className="text-slate-600">•</span>
+          <span className="text-emerald-400 font-medium flex items-center gap-1">
+            <Check className="w-3.5 h-3.5" /> {passedCount} Passed
+          </span>
+          {failedCount > 0 && (
+            <>
+              <span className="text-slate-600">•</span>
+              <span className="text-rose-400 font-medium flex items-center gap-1">
+                <X className="w-3.5 h-3.5" /> {failedCount} Failed
+              </span>
+            </>
+          )}
+          {pendingCount > 0 && (
+            <>
+              <span className="text-slate-600">•</span>
+              <span className="text-amber-400 font-medium flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> {pendingCount} Pending
+              </span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+          <span>Click status pill to toggle Pass / Fail / Pending</span>
+        </div>
       </div>
 
       {/* Edit Detail Modal */}

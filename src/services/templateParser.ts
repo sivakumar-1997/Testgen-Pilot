@@ -158,7 +158,14 @@ export async function parseExistingTestCases(
   // If JSON file
   if (file.name.endsWith('.json')) {
     const text = await file.text();
-    const parsed = JSON.parse(text);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error(
+        'The uploaded file is not a valid JSON document (contains HTML or malformed syntax). Please upload a valid JSON array or an Excel spreadsheet (.xlsx, .xls).'
+      );
+    }
     const rawCases = Array.isArray(parsed) ? parsed : parsed.testCases || parsed.cases || [];
     const testCases: import('../types').TestCase[] = rawCases.map((rc: any, idx: number) => ({
       id: rc.id || rc.testCaseId || `TC-IMP-${String(idx + 1).padStart(3, '0')}`,

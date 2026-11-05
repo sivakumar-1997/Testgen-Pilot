@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Brain,
+  Database,
   Search,
   Upload,
   Sparkles,
@@ -73,7 +73,7 @@ export const MemoryBrainCard: React.FC<MemoryBrainCardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#1b2233]">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
-            <Brain className="w-5 h-5" />
+            <Database className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -258,7 +258,7 @@ export const MemoryBrainCard: React.FC<MemoryBrainCardProps> = ({
       ) : (
         <div className="bg-[#10141d] border border-dashed border-[#1e2638] rounded-2xl p-10 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mx-auto">
-            <Brain className="w-6 h-6" />
+            <Database className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-bold text-white">No Matching Historical Memory Found</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">

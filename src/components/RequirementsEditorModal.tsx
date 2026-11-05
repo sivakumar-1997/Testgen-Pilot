@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import {
   Sparkles,
   Upload,
-  Brain,
+  Database,
   FileText,
   AlertCircle,
   X,
@@ -378,7 +378,7 @@ Validate that uploaded requirement attachments adhere strictly to the 25.0 MB bo
             <div className="bg-purple-950/20 border border-purple-500/30 rounded-xl p-3 space-y-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-purple-300 text-xs">
-                  <Brain className="w-4 h-4 text-purple-400" />
+                  <Database className="w-4 h-4 text-purple-400" />
                   <span>
                     Memory Brain Active: Found {recalledMemories.length} historical suite(s) with {totalRecalledCases} past cases
                   </span>
@@ -399,7 +399,7 @@ Validate that uploaded requirement attachments adhere strictly to the 25.0 MB bo
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-md bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                  <Brain className="w-3.5 h-3.5" />
+                  <Cpu className="w-3.5 h-3.5" />
                 </div>
                 <div>
                   <div className="font-bold text-white text-xs">AI Brain Memory & Incremental Suite Diff</div>

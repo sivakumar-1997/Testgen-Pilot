@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
   Upload,
-  Brain,
   FileSpreadsheet,
   AlertCircle,
   X,
@@ -332,7 +331,7 @@ export const ImportTestCasesModal: React.FC<ImportTestCasesModalProps> = ({
               disabled={detectedCases.length === 0 || isParsing}
               className="flex items-center gap-2 px-5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold shadow-sm shadow-purple-600/30 transition disabled:opacity-50"
             >
-              <Brain className="w-4 h-4" />
+              <Database className="w-4 h-4" />
               <span>Ground into Memory Brain</span>
             </button>
           </div>
