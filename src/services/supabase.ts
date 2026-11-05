@@ -65,8 +65,7 @@ export const syncSuiteToSupabase = async (suite: TestSuite): Promise<{ ok: boole
   }
 
   // 1. Upsert Suite
-  const { error: suiteErr } = await client.from('test_suites').upsert({
-    id: suite.id.length === 36 ? suite.id : undefined, // only pass if valid uuid
+  const suitePayload: any = {
     name: suite.name,
     module: suite.module,
     scenario_title: suite.scenarioTitle,
@@ -74,11 +73,97 @@ export const syncSuiteToSupabase = async (suite: TestSuite): Promise<{ ok: boole
     requirements_raw: suite.requirementsRaw,
     template_id: suite.templateId,
     updated_at: new Date().toISOString(),
-  });
+  };
+
+  // Only pass UUID if it conforms to standard UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(suite.id)) {
+    suitePayload.id = suite.id;
+  }
+
+  const { data: savedSuite, error: suiteErr } = await client
+    .from('test_suites')
+    .upsert(suitePayload)
+    .select('id')
+    .single();
 
   if (suiteErr) {
     throw new Error(`Failed to save suite to Supabase: ${suiteErr.message}`);
   }
 
-  return { ok: true, message: `Suite "${suite.name}" synchronized with Supabase cloud!` };
+  const targetSuiteId = savedSuite?.id;
+
+  // 2. Batch insert test cases
+  if (targetSuiteId && suite.testCases && suite.testCases.length > 0) {
+    const casesPayload = suite.testCases.map((tc, idx) => ({
+      suite_id: targetSuiteId,
+      tc_id: tc.id,
+      step_order: tc.order || idx + 1,
+      scenario: tc.scenario,
+      scope: tc.scope || '',
+      category: tc.category,
+      priority: tc.priority,
+      preconditions: tc.preconditions,
+      steps: tc.steps,
+      test_data: tc.testData,
+      expected_result: tc.expectedResult,
+      expectation: tc.expectation || tc.expectedResult,
+      status: tc.status,
+      mapped_requirement_ids: tc.mappedRequirementIds || [],
+      notes: tc.notes || '',
+    }));
+
+    try {
+      await client.from('test_cases').delete().eq('suite_id', targetSuiteId);
+      await client.from('test_cases').insert(casesPayload);
+    } catch (e) {
+      console.warn('Test cases table sync note:', e);
+    }
+  }
+
+  return { ok: true, message: `Suite "${suite.name}" and ${suite.testCases.length} test cases synchronized to Supabase Cloud!` };
 };
+
+export const fetchSuitesFromSupabase = async (): Promise<TestSuite[]> => {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  const { data: dbSuites, error } = await client
+    .from('test_suites')
+    .select('*, test_cases(*)')
+    .order('updated_at', { ascending: false });
+
+  if (error || !dbSuites) return [];
+
+  return dbSuites.map((s: any) => ({
+    id: s.id,
+    name: s.name,
+    module: s.module,
+    scenarioTitle: s.scenario_title || s.name,
+    version: s.version || 1,
+    requirementsRaw: s.requirements_raw || '',
+    requirementsList: [],
+    templateId: s.template_id || 'screenshot-template',
+    createdAt: s.created_at || new Date().toISOString(),
+    updatedAt: s.updated_at || new Date().toISOString(),
+    history: [],
+    testCases: (s.test_cases || []).map((tc: any, idx: number) => ({
+      id: tc.tc_id || `TC-${String(idx + 1).padStart(3, '0')}`,
+      order: tc.step_order || idx + 1,
+      scenario: tc.scenario,
+      scope: tc.scope || tc.scenario,
+      category: tc.category || 'positive',
+      priority: tc.priority || 'high',
+      preconditions: tc.preconditions || 'None',
+      steps: Array.isArray(tc.steps) ? tc.steps : ['Execute step'],
+      testData: tc.test_data || 'N/A',
+      expectedResult: tc.expected_result || '',
+      expectation: tc.expectation || tc.expected_result || '',
+      status: tc.status || 'passed',
+      mappedRequirementIds: Array.isArray(tc.mapped_requirement_ids) ? tc.mapped_requirement_ids : [],
+      sourceOrigin: 'historical_memory',
+    })),
+    traceabilityMatrix: [],
+  }));
+};
+

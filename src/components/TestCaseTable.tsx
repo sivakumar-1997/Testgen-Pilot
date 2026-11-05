@@ -193,6 +193,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
               <option value="edge">Edge Case</option>
               <option value="accessibility">Accessibility</option>
               <option value="security">Security</option>
+              <option value="ui">UI & Responsive</option>
             </select>
           </div>
 
@@ -272,9 +273,21 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
                       if (col.key === 'id') {
                         return (
                           <td key={col.key} className="p-3">
-                            <span className="font-mono font-bold px-2 py-0.5 rounded bg-[#161c2b] text-indigo-400 border border-[#242e44]">
-                              {tc.id}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold px-2 py-0.5 rounded bg-[#161c2b] text-indigo-400 border border-[#242e44]">
+                                {tc.id}
+                              </span>
+                              {tc.sourceOrigin === 'historical_memory' && (
+                                <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Recalled from Memory Brain">
+                                  Brain
+                                </span>
+                              )}
+                              {tc.sourceOrigin === 'imported' && (
+                                <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30" title="Imported from file">
+                                  Import
+                                </span>
+                              )}
+                            </div>
                           </td>
                         );
                       }
@@ -289,6 +302,7 @@ export const TestCaseTable: React.FC<TestCaseTableProps> = ({
                           accessibility: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
                           edge: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
                           security: 'bg-red-500/10 text-red-400 border-red-500/20',
+                          ui: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
                         };
                         return (
                           <td key={col.key} className="p-3">

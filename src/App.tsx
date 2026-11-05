@@ -12,6 +12,8 @@ import {
   KnowledgeDocument,
   TestCase,
   TestSuiteVersion,
+  TicketPlatform,
+  TesterQuestion,
 } from './types';
 import {
   getStoredSuites,
@@ -28,17 +30,22 @@ import {
   saveKnowledgeBase,
 } from './services/storage';
 import { initAuth } from './services/googleWorkspace';
-import { Header } from './components/Header';
+import { Header, AppTab } from './components/Header';
 import { SidebarTree } from './components/SidebarTree';
 import { TestCaseTable } from './components/TestCaseTable';
 import { TraceabilityMatrixView } from './components/TraceabilityMatrixView';
+import { MRAnalysisCard } from './components/MRAnalysisCard';
+import { TesterQuestionsCard } from './components/TesterQuestionsCard';
+import { MemoryBrainCard } from './components/MemoryBrainCard';
 import { RequirementsEditorModal } from './components/RequirementsEditorModal';
+import { ImportTestCasesModal } from './components/ImportTestCasesModal';
 import { ExportModal } from './components/ExportModal';
 import { ModelSettingsModal } from './components/ModelSettingsModal';
 import { KnowledgeBaseModal } from './components/KnowledgeBaseModal';
 import { CustomTemplateModal } from './components/CustomTemplateModal';
 import { DiffTimelineModal } from './components/DiffTimelineModal';
 import { DeployConfigModal } from './components/DeployConfigModal';
+import { Zap, AlertCircle, X } from 'lucide-react';
 
 export default function App() {
   const [suites, setSuites] = useState<TestSuite[]>(getStoredSuites);
@@ -48,11 +55,13 @@ export default function App() {
   const [modelSettings, setModelSettings] = useState<ModelSettings>(getModelSettings);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeDocument[]>(getKnowledgeBase);
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'test-cases' | 'traceability-matrix'>('test-cases');
+  const [activeTab, setActiveTab] = useState<AppTab>('test-cases');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [failoverToast, setFailoverToast] = useState<string | null>(null);
 
   // Modal open states
   const [isRequirementsModalOpen, setIsRequirementsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isModelSettingsOpen, setIsModelSettingsOpen] = useState(false);
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
@@ -210,16 +219,28 @@ export default function App() {
     }
   };
 
+  // Import external test suite
+  const handleImportComplete = (importedSuite: TestSuite) => {
+    setSuites((prev) => [importedSuite, ...prev]);
+    setActiveSuiteId(importedSuite.id);
+  };
+
   // AI Generation & Brain Incremental Diff Execution
   const handleGenerate = async ({
     requirements,
     scenarioTitle,
     moduleName,
+    ticketPlatform,
+    ticketKey,
+    historicalContext,
     isIncrementalUpdate,
   }: {
     requirements: string;
     scenarioTitle: string;
     moduleName: string;
+    ticketPlatform?: TicketPlatform;
+    ticketKey?: string;
+    historicalContext?: string;
     isIncrementalUpdate: boolean;
   }) => {
     const activeKnowledgeText = knowledgeBase
@@ -234,9 +255,12 @@ export default function App() {
         requirements,
         scenarioTitle,
         moduleName,
+        ticketPlatform,
+        ticketKey,
         template: activeTemplate,
         knowledgeBase: activeKnowledgeText,
         previousSuite: isIncrementalUpdate ? activeSuite.testCases : undefined,
+        historicalContext,
         isIncrementalUpdate,
         modelConfig: modelSettings,
       }),
@@ -248,6 +272,11 @@ export default function App() {
     }
 
     const data = await response.json();
+
+    if (data.failoverNotice) {
+      setFailoverToast(data.failoverNotice);
+      setTimeout(() => setFailoverToast(null), 8000);
+    }
 
     // Create history checkpoint
     const currentVersion: TestSuiteVersion = {
@@ -267,12 +296,16 @@ export default function App() {
       name: scenarioTitle,
       scenarioTitle,
       module: moduleName,
+      ticketPlatform: ticketPlatform || s.ticketPlatform,
+      ticketKey: ticketKey || s.ticketKey,
       version: newVersion,
       requirementsRaw: requirements,
       requirementsList: data.requirementsList || s.requirementsList,
       testCases: data.testCases || s.testCases,
       traceabilityMatrix: data.traceabilityMatrix || s.traceabilityMatrix,
       suiteSummary: data.suiteSummary,
+      mrAnalysis: data.mrAnalysis || s.mrAnalysis,
+      testerQuestions: data.testerQuestions || s.testerQuestions,
       history: isIncrementalUpdate ? [currentVersion, ...(s.history || [])] : [currentVersion],
     }));
   };
@@ -302,10 +335,29 @@ export default function App() {
         onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
         onOpenHistoryModal={() => setIsHistoryModalOpen(true)}
         onOpenDeployConfig={() => setIsDeployConfigOpen(true)}
+        onOpenImportModal={() => setIsImportModalOpen(true)}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
+
+      {/* Auto-Failover Notification Banner */}
+      {failoverToast && (
+        <div className="bg-amber-950/80 border-b border-amber-500/40 px-4 py-2 flex items-center justify-between text-xs text-amber-200">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Auto-Failover Triggered:</strong> {failoverToast}
+            </span>
+          </div>
+          <button
+            onClick={() => setFailoverToast(null)}
+            className="p-1 text-amber-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Main Workspace Body */}
       <div className="flex-1 flex overflow-hidden">
@@ -322,7 +374,7 @@ export default function App() {
 
         {/* Center / Right Content Panel */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0b0e14]">
-          {activeTab === 'test-cases' ? (
+          {activeTab === 'test-cases' && (
             <TestCaseTable
               suite={activeSuite}
               template={activeTemplate}
@@ -333,7 +385,38 @@ export default function App() {
               onOpenRequirementsModal={() => setIsRequirementsModalOpen(true)}
               onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
             />
-          ) : (
+          )}
+
+          {activeTab === 'mr-analysis' && (
+            <MRAnalysisCard
+              suite={activeSuite}
+              onOpenRequirementsModal={() => setIsRequirementsModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'tester-questions' && (
+            <TesterQuestionsCard
+              suite={activeSuite}
+              onUpdateQuestion={(updated) =>
+                updateCurrentSuite((s) => ({ ...s, testerQuestions: updated }))
+              }
+              onOpenRequirementsModal={() => setIsRequirementsModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'memory-brain' && (
+            <MemoryBrainCard
+              suite={activeSuite}
+              allSuites={suites}
+              onMergeCases={(cases) =>
+                updateCurrentSuite((s) => ({ ...s, testCases: [...s.testCases, ...cases] }))
+              }
+              onOpenImportModal={() => setIsImportModalOpen(true)}
+              onOpenRequirementsModal={() => setIsRequirementsModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'traceability-matrix' && (
             <TraceabilityMatrixView
               suite={activeSuite}
               onSelectTestCase={(tc) => {
@@ -353,6 +436,13 @@ export default function App() {
           knowledgeBase={knowledgeBase}
           onGenerate={handleGenerate}
           onClose={() => setIsRequirementsModalOpen(false)}
+        />
+      )}
+
+      {isImportModalOpen && (
+        <ImportTestCasesModal
+          onImportComplete={handleImportComplete}
+          onClose={() => setIsImportModalOpen(false)}
         />
       )}
 

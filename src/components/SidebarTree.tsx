@@ -37,13 +37,13 @@ export const SidebarTree: React.FC<SidebarTreeProps> = ({
   onCloseMobile,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [openModules, setOpenModules] = useState<Record<string, boolean>>({
-    'File Management': true,
-    'Core System': true,
-  });
+  const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
 
   const toggleModule = (modName: string) => {
-    setOpenModules((prev) => ({ ...prev, [modName]: !prev[modName] }));
+    setOpenModules((prev) => ({
+      ...prev,
+      [modName]: prev[modName] === false ? true : false,
+    }));
   };
 
   // Group suites by module

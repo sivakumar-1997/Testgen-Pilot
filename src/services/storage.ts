@@ -134,3 +134,73 @@ export const saveKnowledgeBase = (docs: KnowledgeDocument[]): void => {
     console.error('Failed to save knowledge base:', e);
   }
 };
+
+/**
+ * Memory Brain Recall Search
+ * Scans all stored suites for overlapping domain keywords (e.g. "shipment", "carrier", "webhook", "auth", "upload", "payment")
+ * and extracts matching test cases and past learnings to ground the current test generation.
+ */
+export const searchHistoricalMemory = (
+  queryText: string,
+  excludeSuiteId?: string
+): import('../types').RecalledMemory[] => {
+  if (!queryText || queryText.trim().length < 2) return [];
+
+  const suites = getStoredSuites();
+  // Extract search tokens: lowercase, alphanumeric words >= 3 chars
+  const stopWords = new Set([
+    'the', 'and', 'for', 'that', 'this', 'with', 'from', 'have', 'were', 'will',
+    'should', 'must', 'user', 'when', 'then', 'test', 'case', 'suite', 'page'
+  ]);
+  const rawTokens = queryText.toLowerCase().replace(/[^a-z0-9\s_-]/g, ' ').split(/\s+/);
+  const keywords = Array.from(new Set(rawTokens.filter((t) => t.length >= 3 && !stopWords.has(t))));
+
+  if (keywords.length === 0) return [];
+
+  const recalled: import('../types').RecalledMemory[] = [];
+
+  for (const suite of suites) {
+    if (excludeSuiteId && suite.id === excludeSuiteId) continue;
+
+    const suiteCorpus = `${suite.name} ${suite.module} ${suite.scenarioTitle} ${suite.requirementsRaw}`.toLowerCase();
+    const matched = keywords.filter((kw) => suiteCorpus.includes(kw));
+
+    if (matched.length > 0) {
+      // Find matching test cases within this suite
+      const matchingCases = suite.testCases.filter((tc) => {
+        const tcCorpus = `${tc.scenario} ${tc.scope} ${tc.expectedResult} ${tc.testData} ${tc.preconditions} ${tc.notes || ''}`.toLowerCase();
+        return matched.some((kw) => tcCorpus.includes(kw));
+      });
+
+      // Extract past learnings from MR analysis or notes
+      const pastLearnings: string[] = [];
+      if (suite.mrAnalysis?.regressionRisks) {
+        pastLearnings.push(...suite.mrAnalysis.regressionRisks);
+      }
+      if (suite.mrAnalysis?.rootCause) {
+        pastLearnings.push(`Root cause lesson: ${suite.mrAnalysis.rootCause}`);
+      }
+      for (const tc of matchingCases) {
+        if (tc.notes) pastLearnings.push(tc.notes);
+      }
+
+      if (matchingCases.length > 0 || pastLearnings.length > 0) {
+        recalled.push({
+          suiteId: suite.id,
+          suiteName: suite.name,
+          module: suite.module,
+          matchedKeywords: matched,
+          recalledCasesCount: matchingCases.length,
+          historicalCases: matchingCases.map((tc) => ({
+            ...tc,
+            sourceOrigin: 'historical_memory',
+          })),
+          pastLearnings: Array.from(new Set(pastLearnings)).slice(0, 5),
+        });
+      }
+    }
+  }
+
+  return recalled;
+};
+

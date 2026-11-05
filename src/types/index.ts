@@ -5,13 +5,14 @@ export type TestCaseCategory =
   | 'corner'
   | 'accessibility'
   | 'edge'
-  | 'security';
+  | 'security'
+  | 'ui';
 
 export type TestCasePriority = 'critical' | 'high' | 'medium' | 'low';
 
 export type TestCaseStatus = 'passed' | 'failed' | 'pending' | 'blocked' | 'skipped';
 
-export type DiffType = 'new' | 'modified' | 'deprecated' | 'unchanged';
+export type DiffType = 'new' | 'modified' | 'deprecated' | 'unchanged' | 'recalled';
 
 export interface TestCase {
   id: string; // e.g., TC-001
@@ -24,13 +25,14 @@ export interface TestCase {
   steps: string[];
   testData: string;
   expectedResult: string;
-  expectation: string; // Short concise expectation (as shown in reference screenshot)
+  expectation: string; // Short concise expectation
   status: TestCaseStatus;
   mappedRequirementIds: string[]; // e.g. ['FR-001', 'FR-006']
   diffType?: DiffType;
   diffSummary?: string;
   customFields?: Record<string, string>;
   notes?: string;
+  sourceOrigin?: 'current_mr' | 'historical_memory' | 'imported';
 }
 
 export interface RequirementItem {
@@ -57,14 +59,43 @@ export interface SuiteSummary {
   cornerCount: number;
   accessibilityCount: number;
   securityCount: number;
+  uiCount?: number;
   coveragePercentage: number;
   assumptions?: string[];
 }
 
 export interface ChangeLogItem {
-  changeType: 'added' | 'modified' | 'deprecated' | 'unchanged';
+  changeType: 'added' | 'modified' | 'deprecated' | 'unchanged' | 'recalled';
   description: string;
   affectedItems?: string[];
+}
+
+export interface TesterQuestion {
+  id: string;
+  question: string;
+  rationale: string;
+  targetRole: 'Developer' | 'Product Owner' | 'DevOps' | 'Security';
+  status?: 'open' | 'answered' | 'verified';
+  answer?: string;
+}
+
+export interface MRAnalysis {
+  actualFixSummary: string; // Section 2: What the MR is going to fix
+  rootCause: string;
+  impactedComponents: string[];
+  regressionRisks: string[];
+  architectureChanges: string[];
+  suggestedAutomations: string[];
+}
+
+export interface RecalledMemory {
+  suiteId: string;
+  suiteName: string;
+  module: string;
+  matchedKeywords: string[];
+  recalledCasesCount: number;
+  historicalCases: TestCase[];
+  pastLearnings: string[];
 }
 
 export interface TestSuiteVersion {
@@ -75,11 +106,15 @@ export interface TestSuiteVersion {
   testCases: TestCase[];
 }
 
+export type TicketPlatform = 'gitlab' | 'jira' | 'cyber' | 'linear' | 'generic';
+
 export interface TestSuite {
   id: string;
   name: string;
   module: string;
   scenarioTitle: string;
+  ticketPlatform?: TicketPlatform;
+  ticketKey?: string;
   version: number;
   requirementsRaw: string;
   requirementsList: RequirementItem[];
@@ -87,6 +122,9 @@ export interface TestSuite {
   traceabilityMatrix: TraceabilityMapping[];
   suiteSummary?: SuiteSummary;
   templateId: string;
+  mrAnalysis?: MRAnalysis; // Section 2
+  testerQuestions?: TesterQuestion[]; // Section 3
+  recalledMemories?: RecalledMemory[]; // Memory brain recall
   createdAt: string;
   updatedAt: string;
   history: TestSuiteVersion[];
@@ -115,14 +153,24 @@ export interface ModelSettings {
   modelName: string;
   apiKey?: string;
   localEndpoint?: string;
+  autoFailoverEnabled?: boolean;
+  fallbackProvider?: AIProvider;
 }
 
 export interface KnowledgeDocument {
   id: string;
   name: string;
   content: string;
-  category: 'guideline' | 'template' | 'glossary' | 'bug_pattern';
+  category: 'guideline' | 'template' | 'glossary' | 'bug_pattern' | 'past_cases';
   fileSize?: string;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface UserAuthProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  authMethod: 'google' | 'sso' | 'password' | 'guest';
 }

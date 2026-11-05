@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Sparkles,
   Upload,
@@ -11,8 +11,13 @@ import {
   BookOpen,
   Layers,
   HelpCircle,
+  GitMerge,
+  Cpu,
+  Search,
+  Zap,
 } from 'lucide-react';
-import { TestSuite, ModelSettings, CustomTemplate, KnowledgeDocument } from '../types';
+import { TestSuite, ModelSettings, CustomTemplate, KnowledgeDocument, TicketPlatform } from '../types';
+import { searchHistoricalMemory } from '../services/storage';
 
 interface RequirementsEditorModalProps {
   suite: TestSuite;
@@ -23,6 +28,9 @@ interface RequirementsEditorModalProps {
     requirements: string;
     scenarioTitle: string;
     moduleName: string;
+    ticketPlatform?: TicketPlatform;
+    ticketKey?: string;
+    historicalContext?: string;
     isIncrementalUpdate: boolean;
   }) => Promise<void>;
   onClose: () => void;
@@ -36,15 +44,87 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
   onGenerate,
   onClose,
 }) => {
+  const [platform, setPlatform] = useState<TicketPlatform>(suite.ticketPlatform || 'gitlab');
+  const [ticketKey, setTicketKey] = useState(suite.ticketKey || '!384');
   const [requirements, setRequirements] = useState(suite.requirementsRaw || '');
   const [scenarioTitle, setScenarioTitle] = useState(suite.scenarioTitle || suite.name);
-  const [moduleName, setModuleName] = useState(suite.module || 'Core');
+  const [moduleName, setModuleName] = useState(suite.module || 'Shipment');
   const [isIncrementalUpdate, setIsIncrementalUpdate] = useState(suite.testCases.length > 0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeDocs = knowledgeBase.filter((k) => k.isActive);
+
+  // Live historical memory search based on current inputs
+  const recalledMemories = useMemo(() => {
+    const query = `${moduleName} ${scenarioTitle} ${requirements}`.slice(0, 300);
+    return searchHistoricalMemory(query, suite.id);
+  }, [moduleName, scenarioTitle, requirements, suite.id]);
+
+  const totalRecalledCases = recalledMemories.reduce((sum, m) => sum + m.recalledCasesCount, 0);
+
+  // Sample Loaders for Quick Tester Testing
+  const loadShipmentMRSample = () => {
+    setPlatform('gitlab');
+    setTicketKey('MR-!412');
+    setModuleName('Logistics & Shipment');
+    setScenarioTitle('GitLab MR !412: Multi-Carrier Tracking Retry & Postal Code Normalization');
+    setRequirements(`# GitLab Merge Request: !412
+## Source Branch: feature/carrier-retry-webhook -> main
+## Related Issue: #1420 - High error rate on international shipments during DHL carrier maintenance
+
+### Context & Fix:
+When DHL Express or FedEx returns HTTP 500/503 during carrier maintenance windows, the shipment tracker must execute an exponential backoff retry (1s, 2s, 4s, 8s, up to 5 attempts) before marking status as "Delivery Delayed".
+
+### Acceptance Criteria:
+1. Webhook and REST poller must implement circuit-breaker and exponential jittered backoff.
+2. If carrier returns 5xx, do NOT drop the event; queue in Redis retry stream with attempt counter.
+3. International postal codes (UK: "SW1A 1AA", Canada: "M5V 2T6") must be normalized with stripped whitespace and uppercase formatting.
+4. Edge Case: If order has already reached "Delivered", subsequent delayed webhooks with "In Transit" must be discarded (prevent reverse state transition).
+5. Security: HMAC-SHA256 signature verification required on all incoming webhook payloads.`);
+  };
+
+  const loadJiraAuthSample = () => {
+    setPlatform('jira');
+    setTicketKey('SEC-892');
+    setModuleName('Authentication & Security');
+    setScenarioTitle('JIRA SEC-892: Multi-Factor Authentication & Refresh Token Expiration');
+    setRequirements(`### JIRA Issue: SEC-892
+**Issue Type:** Story
+**Epic:** Identity & Access Management (IAM)
+
+**Description:**
+As a security compliance officer,
+I need users with Admin or Billing roles to be prompted for TOTP/MFA upon logging in from an unrecognized IP address, and enforce refresh token revocation upon password change.
+
+**Acceptance Criteria:**
+- Unrecognized IP triggers 6-digit TOTP challenge with 3-minute expiration.
+- Maximum 3 incorrect TOTP attempts before account is locked for 15 minutes.
+- Corner case: Token refresh request with expired refresh token must return HTTP 401 with code "TOKEN_EXPIRED".
+- Boundary case: Password length strictly between 8 and 64 characters with at least 1 symbol and 1 number.
+- UI: Show accessible error banner with countdown timer for locked accounts.`);
+  };
+
+  const loadServiceNowSample = () => {
+    setPlatform('cyber');
+    setTicketKey('INC-7049');
+    setModuleName('File Management');
+    setScenarioTitle('Cyber Ticket INC-7049: Boundary Upload Limit & Anti-Malware MIME Check');
+    setRequirements(`### Cyber / ServiceNow Ticket: INC-7049
+**Priority:** High
+**Category:** Security & Storage
+
+**User Story:**
+Validate that uploaded requirement attachments adhere strictly to the 25.0 MB boundary limit and undergo magic-byte MIME type inspection to block disguised executable files (.exe renamed to .pdf).
+
+**Acceptance Criteria:**
+- Files <= 25,000,000 bytes accepted.
+- Files >= 25,000,001 bytes rejected client-side and server-side.
+- Inspect magic bytes (first 4 bytes) to verify PDF (%PDF) or PNG/JPEG header.
+- Reject polyglot files containing embedded scripts.
+- Display accessible WCAG 2.1 AA alert toast with explicit allowed size.`);
+  };
 
   // File upload handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,12 +160,33 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
       return;
     }
 
+    // Build historical context from recalled memories
+    let historicalContextText = '';
+    if (recalledMemories.length > 0) {
+      historicalContextText = recalledMemories
+        .map(
+          (m) =>
+            `[Recalled Past Suite: ${m.suiteName} (${m.module})]\n` +
+            `Matched Keywords: ${m.matchedKeywords.join(', ')}\n` +
+            `Past Learnings: ${m.pastLearnings.join('; ')}\n` +
+            `Key Historical Cases:\n` +
+            m.historicalCases
+              .slice(0, 4)
+              .map((c) => `- ${c.id}: ${c.scenario} -> Expected: ${c.expectedResult}`)
+              .join('\n')
+        )
+        .join('\n\n');
+    }
+
     try {
       setIsGenerating(true);
       await onGenerate({
         requirements: requirements.trim(),
         scenarioTitle: scenarioTitle.trim() || 'Feature Specification',
         moduleName: moduleName.trim() || 'General',
+        ticketPlatform: platform,
+        ticketKey: ticketKey.trim(),
+        historicalContext: historicalContextText,
         isIncrementalUpdate,
       });
       onClose();
@@ -107,10 +208,10 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
             </div>
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                AI Test Case Generator & Suite Memory
+                AI Test Case Generator & 4-Section Review Engine
               </h3>
               <p className="text-[11px] text-slate-400">
-                Analyze requirements, user stories, discussions, or Jira tickets to generate full RTCM coverage.
+                Section 1 (Template) • Section 2 (MR Fix Analysis) • Section 3 (Tester Questions) • Section 4 (Full Test Cases)
               </p>
             </div>
           </div>
@@ -134,8 +235,65 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
             </div>
           )}
 
-          {/* Module & Scenario Title */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Ticket Platform Selector & Sample Loaders */}
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <GitMerge className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Ticket / MR Source Platform:</span>
+              </label>
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="text-slate-500">Quick Samples:</span>
+                <button
+                  type="button"
+                  onClick={loadShipmentMRSample}
+                  className="px-2 py-0.5 rounded bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 border border-indigo-500/30 font-medium"
+                >
+                  GitLab Shipment MR
+                </button>
+                <button
+                  type="button"
+                  onClick={loadJiraAuthSample}
+                  className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 font-medium"
+                >
+                  Jira Auth
+                </button>
+                <button
+                  type="button"
+                  onClick={loadServiceNowSample}
+                  className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/30 font-medium"
+                >
+                  Cyber Upload
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+              {[
+                { id: 'gitlab', label: 'GitLab MR' },
+                { id: 'jira', label: 'Jira Issue' },
+                { id: 'cyber', label: 'Cyber / ServiceNow' },
+                { id: 'linear', label: 'Linear' },
+                { id: 'generic', label: 'Generic / Notes' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setPlatform(p.id as TicketPlatform)}
+                  className={`p-2 rounded-lg font-medium text-xs border text-center transition ${
+                    platform === p.id
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                      : 'bg-[#141824] text-slate-400 border-[#1e2638] hover:text-white'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Module, Ticket Key & Scenario Title */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-slate-300 mb-1 font-semibold">
                 Module / Epic
@@ -144,9 +302,21 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
                 type="text"
                 value={moduleName}
                 onChange={(e) => setModuleName(e.target.value)}
-                placeholder="e.g. File Management, Authentication"
+                placeholder="e.g. Logistics & Shipment, Auth"
                 className="w-full bg-[#141824] border border-[#1e2638] rounded-lg p-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
                 required
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 mb-1 font-semibold">
+                MR / Ticket ID
+              </label>
+              <input
+                type="text"
+                value={ticketKey}
+                onChange={(e) => setTicketKey(e.target.value)}
+                placeholder="e.g. !384, PROD-1029"
+                className="w-full bg-[#141824] border border-[#1e2638] rounded-lg p-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>
@@ -157,7 +327,7 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
                 type="text"
                 value={scenarioTitle}
                 onChange={(e) => setScenarioTitle(e.target.value)}
-                placeholder="e.g. Upload file exceeding size limit"
+                placeholder="e.g. Carrier Webhook Retry"
                 className="w-full bg-[#141824] border border-[#1e2638] rounded-lg p-2.5 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
                 required
               />
@@ -169,7 +339,7 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-slate-300 font-semibold flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                Requirement Specification / User Story / Ticket
+                <span>Ticket Instructions, MR Description & Diff:</span>
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -194,16 +364,37 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
             </div>
 
             <textarea
-              rows={9}
+              rows={8}
               value={requirements}
               onChange={(e) => setRequirements(e.target.value)}
-              placeholder="Enter requirement text, user story, or Jira acceptance criteria here..."
+              placeholder="Paste the issue ticket description, GitLab MR instructions, or discussion here..."
               className="w-full bg-[#141824] border border-[#1e2638] rounded-xl p-3 text-white placeholder-slate-600 font-mono text-xs focus:outline-none focus:border-indigo-500 leading-relaxed"
               required
             />
           </div>
 
-          {/* AI Brain Memory & Incremental Suite Diff Engine */}
+          {/* Live Memory Brain Recall Indicator */}
+          {recalledMemories.length > 0 && (
+            <div className="bg-purple-950/20 border border-purple-500/30 rounded-xl p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-purple-300 text-xs">
+                  <Brain className="w-4 h-4 text-purple-400" />
+                  <span>
+                    Memory Brain Active: Found {recalledMemories.length} historical suite(s) with {totalRecalledCases} past cases
+                  </span>
+                </div>
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-200">
+                  Grounded Recall
+                </span>
+              </div>
+              <p className="text-[11px] text-purple-200/80">
+                Matched past knowledge from <strong>{recalledMemories.map((m) => m.suiteName).join(', ')}</strong>.
+                The AI will learn from earlier test scenarios, boundary validations, and bug history in this domain.
+              </p>
+            </div>
+          )}
+
+          {/* AI Brain Incremental Suite Diff Engine */}
           <div className="bg-[#141824] border border-[#1e2638] rounded-xl p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -239,12 +430,12 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
             )}
           </div>
 
-          {/* Active Grounding Context */}
-          <div className="grid grid-cols-2 gap-3 text-[11px] text-slate-400">
+          {/* Active Grounding Context & Auto-Failover status */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-400">
             <div className="flex items-center gap-1.5 p-2 rounded-lg bg-[#141824] border border-[#1e2638]">
               <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               <span className="truncate">
-                Knowledge Base: <strong className="text-slate-200">{activeDocs.length} Active Guides</strong>
+                Knowledge: <strong className="text-slate-200">{activeDocs.length} Guides</strong>
               </span>
             </div>
             <div className="flex items-center gap-1.5 p-2 rounded-lg bg-[#141824] border border-[#1e2638]">
@@ -253,12 +444,18 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
                 Template: <strong className="text-slate-200">{template.name}</strong>
               </span>
             </div>
+            <div className="flex items-center gap-1.5 p-2 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-emerald-300">
+              <Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">
+                Auto-Failover: <strong>Active (Zero Quota Outage)</strong>
+              </span>
+            </div>
           </div>
 
           {/* Footer Actions */}
           <div className="flex items-center justify-between pt-4 border-t border-[#1b2233]">
             <div className="text-[11px] text-slate-400">
-              Target Engine:{' '}
+              Primary Agent:{' '}
               <span className="text-indigo-400 font-semibold uppercase">
                 {modelSettings.provider} ({modelSettings.modelName})
               </span>
@@ -280,12 +477,12 @@ export const RequirementsEditorModal: React.FC<RequirementsEditorModalProps> = (
                 {isGenerating ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Synthesizing Suite...</span>
+                    <span>Analyzing & Synthesizing 4 Sections...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>{isIncrementalUpdate ? 'Update Suite with Memory' : 'Generate Full Test Suite'}</span>
+                    <span>{isIncrementalUpdate ? 'Update Suite with Memory' : 'Generate Full 4-Section Suite'}</span>
                   </>
                 )}
               </button>

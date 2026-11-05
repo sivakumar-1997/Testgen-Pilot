@@ -16,10 +16,13 @@ import {
   CheckCircle2,
   Menu,
   Cloud,
+  Upload,
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { ModelSettings, TestSuite } from '../types';
 import { googleSignIn, logoutGoogle } from '../services/googleWorkspace';
+
+export type AppTab = 'test-cases' | 'mr-analysis' | 'tester-questions' | 'memory-brain' | 'traceability-matrix';
 
 interface HeaderProps {
   activeSuite: TestSuite;
@@ -32,8 +35,9 @@ interface HeaderProps {
   onOpenTemplateModal: () => void;
   onOpenHistoryModal: () => void;
   onOpenDeployConfig: () => void;
-  activeTab: 'test-cases' | 'traceability-matrix';
-  setActiveTab: (tab: 'test-cases' | 'traceability-matrix') => void;
+  onOpenImportModal: () => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   onToggleMobileSidebar: () => void;
 }
 
@@ -48,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTemplateModal,
   onOpenHistoryModal,
   onOpenDeployConfig,
+  onOpenImportModal,
   activeTab,
   setActiveTab,
   onToggleMobileSidebar,
@@ -114,38 +119,80 @@ export const Header: React.FC<HeaderProps> = ({
                 TestGen <span className="text-indigo-400">Pilot</span>
               </span>
               <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hidden xs:inline">
-                RTCM
+                4-SECTION QA
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 truncate max-w-[140px] sm:max-w-[200px] md:max-w-[260px]">
+            <p className="text-[11px] text-slate-400 truncate max-w-[120px] sm:max-w-[180px] md:max-w-[220px]">
               {activeSuite.module} / <span className="text-slate-200 font-medium">{activeSuite.name}</span>
             </p>
           </div>
         </div>
 
-        {/* Navigation Tabs (Test Cases vs RTCM Matrix) */}
-        <div className="hidden md:flex items-center bg-[#131722] p-0.5 rounded-lg border border-[#1e2638] ml-2">
+        {/* 4-Section & Navigation Tabs */}
+        <div className="hidden xl:flex items-center bg-[#131722] p-0.5 rounded-lg border border-[#1e2638] ml-2">
           <button
             onClick={() => setActiveTab('test-cases')}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
+            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
               activeTab === 'test-cases'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
+            title="Section 1 & 4: Full Test Cases formatted according to template"
           >
             <Layers className="w-3.5 h-3.5" />
             <span>Test Cases ({activeSuite.testCases.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('mr-analysis')}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
+              activeTab === 'mr-analysis'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="Section 2: What the MR is going to fix"
+          >
+            <Cpu className="w-3.5 h-3.5 text-indigo-300" />
+            <span>MR Fix Analysis</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tester-questions')}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
+              activeTab === 'tester-questions'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="Section 3: Questions to ask as a tester before sign-off"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Tester Inquiries ({activeSuite.testerQuestions?.length || 4})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('memory-brain')}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
+              activeTab === 'memory-brain'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title="Memory Brain & Historical Search Recall"
+          >
+            <Brain className="w-3.5 h-3.5 text-purple-400" />
+            <span>Memory Brain</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('traceability-matrix')}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
+            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
               activeTab === 'traceability-matrix'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
+            title="Requirements Traceability and Coverage Matrix (RTCM)"
           >
             <Grid3X3 className="w-3.5 h-3.5" />
-            <span>RTCM Matrix</span>
+            <span>RTCM</span>
           </button>
         </div>
       </div>
@@ -191,6 +238,16 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Layers className="w-3.5 h-3.5 text-slate-400" />
           <span className="hidden md:inline">Template</span>
+        </button>
+
+        {/* Import Test Cases into Memory Brain */}
+        <button
+          onClick={onOpenImportModal}
+          title="Import existing test cases (.xlsx, .csv, .json) to teach the Memory Brain"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-purple-300 bg-[#161324] hover:bg-[#201a33] border border-purple-500/30 transition"
+        >
+          <Upload className="w-3.5 h-3.5 text-purple-400" />
+          <span className="hidden md:inline">Import</span>
         </button>
 
         {/* Deploy & Cloud Configs (Vercel & Supabase) */}
